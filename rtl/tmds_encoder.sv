@@ -8,7 +8,7 @@ module tmds_encoder(
     output logic    [9:0]   o_q
 );
 
-function logic [7:0] countones(input logic [7:0] d);
+function logic signed [7:0] countones(input logic [7:0] d);
     countones = 0;
     foreach (d[i]) begin
         countones += {7'b0, d[i] == 1};
@@ -23,7 +23,7 @@ function logic [7:0] countzeroes(input logic [7:0] d);
 endfunction
 
 logic [8:0] q_m;
-logic [7:0] q_m_ones;
+logic signed [7:0] q_m_ones;
 always_comb begin
     q_m_ones = countones(i_data);
 
@@ -53,8 +53,8 @@ always_ff @(posedge clk) begin
 end
 
 logic [9:0] q;
-logic [7:0] q_ones;
-logic [7:0] q_zeroes;
+logic signed [7:0] q_ones;
+logic signed [7:0] q_zeroes;
 
 always_comb begin
     q_ones = countones(q_m[7:0]);
@@ -76,12 +76,12 @@ always_comb begin
                 q[9] = 1'b1;
                 q[8] = q_m[8];
                 q[7:0] = ~q_m[7:0];
-                cnt = cnt_prev + {6'b0, q_m[8], 1'b0} + (q_zeroes - q_ones);
+                cnt = cnt_prev + signed'({6'b0, q_m[8], 1'b0}) + (q_zeroes - q_ones);
             end else begin
                 q[9] = 1'b0;
                 q[8] = q_m[8];
                 q[7:0] = q_m[7:0];
-                cnt = cnt_prev - {6'b0, ~q_m[8], 1'b0} + (q_ones - q_zeroes);
+                cnt = cnt_prev - signed'({6'b0, ~q_m[8], 1'b0}) + (q_ones - q_zeroes);
             end
         end
     end else begin
