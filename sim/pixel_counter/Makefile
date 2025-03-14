@@ -11,11 +11,11 @@ EXTRA_ARGS += --trace --trace-structs
 # EXTRA_ARGS += -GHMAX=640 -GVMAX=480
 COMP_ARGS += -G HMAX=6 -G VMAX=4
 
-VERILOG_SOURCES += $(REPO_DIR)/rtl/frame_counter.sv
+VERILOG_SOURCES += $(REPO_DIR)/rtl/pixel_counter.sv
 
-TOPLEVEL = frame_counter
+TOPLEVEL = pixel_counter
 
-MODULE = tb_frame_counter
+MODULE = tb_pixel_counter
 
 COCOTB_HDL_TIMEUNIT = 1ns
 COCOTB_HDL_TIMEPRECISION = 10ps

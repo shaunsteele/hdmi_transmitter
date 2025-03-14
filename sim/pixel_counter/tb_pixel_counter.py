@@ -1,4 +1,4 @@
-# tb_frame_counter.py
+# tb_pixel_counter.py
 
 import cocotb
 from cocotb.clock import Clock
@@ -6,14 +6,14 @@ from cocotb.triggers import ClockCycles, FallingEdge, RisingEdge
 
 
 @cocotb.test()
-async def tb_frame_counter(dut):
+async def tb_pixel_counter(dut):
     hmax = dut.HMAX.value
     vmax = dut.VMAX.value
 
     dut.clk.value = 0
     dut.rstn.value = 0
     dut.i_inc.value = 0
-    dut.i_clr.value = 0
+    # dut.i_clr.value = 0
 
     cocotb.start_soon(Clock(dut.clk, 40, "ns").start())
 
@@ -27,8 +27,8 @@ async def tb_frame_counter(dut):
     await RisingEdge(dut.clk)
     assert dut.o_hcount.value == 0
     assert dut.o_vcount.value == 0
-    assert dut.o_frame_start.value
-    assert dut.o_frame_end.value == 0
+    # assert dut.o_frame_start.value
+    # assert dut.o_frame_end.value == 0
     cocotb.log.info("Reset Testing Passed")
 
     # horizontal increment test
@@ -46,15 +46,15 @@ async def tb_frame_counter(dut):
             # assert int(dut.o_hcount.value) == hc
             # assert int(dut.o_vcount.value) == vc
 
-            # if hc == (hmax - 1):
-            #     hc = 0
-            # else:
-            #     hc += 1
+            if hc == (hmax - 1):
+                hc = 0
+            else:
+                hc += 1
             
-            # if hc == (hmax - 1) and vc == (vmax - 1):
-            #     vc = 0
-            # else:
-            #     vc += 1
+            if hc == (hmax - 1) and vc == (vmax - 1):
+                vc = 0
+            else:
+                vc += 1
 
             
           

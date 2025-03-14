@@ -1,6 +1,6 @@
-// frame_counter.sv
+// pixel_counter.sv
 
-module frame_counter # (
+module pixel_counter # (
     parameter int HMAX = 800,   // Horizontal Max Count
     parameter int VMAX = 600,   // Vertical Max Count
     parameter int HLEN = $clog2(HMAX),
