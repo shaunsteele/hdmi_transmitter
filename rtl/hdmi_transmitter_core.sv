@@ -16,12 +16,10 @@ module hdmi_transmitter_core #(
     input logic             i_cfg_valid,
     input logic     [31:0]  i_cfg_data,
 
-    // serializer
-    input logic             ddr_clk,
-    output logic            o_tmds_red,
-    output logic            o_tmds_grn,
-    output logic            o_tmds_blu,
-    output logic            o_tmds_c
+    // tmds encoded pixel stream
+    output logic    [9:0]   o_tmds_red,
+    output logic    [9:0]   o_tmds_grn,
+    output logic    [9:0]   o_tmds_blu
 );
 
 generate
@@ -80,9 +78,9 @@ pixel_counter #(
 logic tmds_hsync;
 logic tmds_vsync;
 logic tmds_data_en;
-logic [7:0] tmds_red;
-logic [7:0] tmds_grn;
-logic [7:0] tmds_blu;
+logic [7:0] red;
+logic [7:0] grn;
+logic [7:0] blu;
 
 hdmi_controller #(
     .HA         (HActivePixels),
@@ -111,9 +109,9 @@ hdmi_controller #(
     .o_hsync            (tmds_hsync),
     .o_vsync            (tmds_vsync),
     .o_data_en          (tmds_data_en),
-    .o_red              (tmds_red),
-    .o_grn              (tmds_grn),
-    .o_blu              (tmds_blu)
+    .o_red              (red),
+    .o_grn              (grn),
+    .o_blu              (blu)
 );
 
 
@@ -121,123 +119,28 @@ hdmi_controller #(
 logic [3:0] ctl;
 assign ctl = 4'b0;
 
-logic [9:0] tmds_d[4];
-
 tmds_encoder u_RED (
     .clk            (clk),
     .i_data_en      (tmds_data_en),
-    .i_data         (tmds_red),
+    .i_data         (red),
     .i_ctrl         (ctl[3:2]),
-    .o_q            (tmds_d[2])
+    .o_q            (o_tmds_red)
 );
 
 tmds_encoder u_GRN (
     .clk            (clk),
     .i_data_en      (tmds_data_en),
-    .i_data         (tmds_grn),
+    .i_data         (grn),
     .i_ctrl         (ctl[1:0]),
-    .o_q            (tmds_d[1])
+    .o_q            (o_tmds_grn)
 );
 
 tmds_encoder u_BLU (
     .clk            (clk),
     .i_data_en      (tmds_data_en),
-    .i_data         (tmds_blu),
+    .i_data         (blu),
     .i_ctrl         ({tmds_hsync, tmds_vsync}),
-    .o_q            (tmds_d[0])
+    .o_q            (o_tmds_blu)
 );
-
-// output serializer
-assign tmds_d[3] = 10'b0000011111;  // tmds pixel clock
-
-logic [1:0] cascade[4];
-
-logic [3:0] tmds_channels;
-assign {o_tmds_c, o_tmds_red, o_tmds_grn, o_tmds_blu} = tmds_channels[3:0];
-
-logic serdes_reset = 1;
-always_ff @(posedge clk) begin
-    serdes_reset <= 0;
-end
-
-genvar i;
-generate
-    for (i=0; i<4; i++) begin: g_tmds_serdes
-        OSERDESE2 #(
-            .DATA_RATE_OQ("DDR"),
-            .DATA_RATE_TQ("SDR"),
-            .DATA_WIDTH(10),
-            .SERDES_MODE("MASTER"),
-            .TRISTATE_WIDTH(1),
-            .TBYTE_CTL("FALSE"),
-            .TBYTE_SRC("FALSE")
-        ) u_OSERDES0 (
-            .OQ(tmds_channels[i]),
-            .OFB(),
-            .TQ(),
-            .TFB(),
-            .SHIFTOUT1(),
-            .SHIFTOUT2(),
-            .TBYTEOUT(),
-            .CLK(ddr_clk),
-            .CLKDIV(clk),
-            .D1(tmds_d[i][0]),
-            .D2(tmds_d[i][1]),
-            .D3(tmds_d[i][2]),
-            .D4(tmds_d[i][3]),
-            .D5(tmds_d[i][4]),
-            .D6(tmds_d[i][5]),
-            .D7(tmds_d[i][6]),
-            .D8(tmds_d[i][7]),
-            .TCE(1'b0),
-            .OCE(1'b1),
-            .TBYTEIN(1'b0),
-            .RST(serdes_reset),
-            .SHIFTIN1(cascade[i][0]),
-            .SHIFTIN2(cascade[i][1]),
-            .T1(1'b0),
-            .T2(1'b0),
-            .T3(1'b0),
-            .T4(1'b0)
-        );
-        OSERDESE2 #(
-            .DATA_RATE_OQ("DDR"),
-            .DATA_RATE_TQ("SDR"),
-            .DATA_WIDTH(10),
-            .SERDES_MODE("SLAVE"),
-            .TRISTATE_WIDTH(1),
-            .TBYTE_CTL("FALSE"),
-            .TBYTE_SRC("FALSE")
-        ) u_OSERDES1 (
-            .OQ(),
-            .OFB(),
-            .TQ(),
-            .TFB(),
-            .SHIFTOUT1(cascade[i][0]),
-            .SHIFTOUT2(cascade[i][1]),
-            .TBYTEOUT(),
-            .CLK(ddr_clk),
-            .CLKDIV(clk),
-            .D1(1'b0),
-            .D2(1'b0),
-            .D3(tmds_d[i][8]),
-            .D4(tmds_d[i][9]),
-            .D5(1'b0),
-            .D6(1'b0),
-            .D7(1'b0),
-            .D8(1'b0),
-            .TCE(1'b0),
-            .OCE(1'b1),
-            .TBYTEIN(1'b0),
-            .RST(serdes_reset),
-            .SHIFTIN1(1'b0),
-            .SHIFTIN2(1'b0),
-            .T1(1'b0),
-            .T2(1'b0),
-            .T3(1'b0),
-            .T4(1'b0)
-        );
-    end
-endgenerate
 
 endmodule
