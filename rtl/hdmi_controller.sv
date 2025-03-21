@@ -12,17 +12,37 @@ module hdmi_controller #(
     parameter int VB = 33,
     parameter int VMAX = VA + VF + VS + VB
 )(
-    input logic             clk,
-    input logic             rstn,
+    input logic                         clk,
+    input logic                         rstn,
 
-    output logic            o_pixel_inc,
+    // input stream
+    input logic                         i_rgb_valid,
+    input logic     [7:0]               i_rgb_red,
+    input logic     [7:0]               i_rgb_grn,
+    input logic     [7:0]               i_rgb_blu,
 
+    // configuration interface
+    input logic                         i_cfg_valid,
+    input logic     [31:0]              i_cfg_data,
+
+    // pixel counter control
     input logic     [$clog2(HMAX)-1:0]  i_hcount,
     input logic     [$clog2(VMAX)-1:0]  i_vcount,
+    output logic                        o_pixel_inc,
 
-    output logic            o_hsync,
-    output logic            o_vsync,
-    output logic            o_data_en
+    // test pattern data
+    input logic     [7:0]               i_test_pattern_red,
+    input logic     [7:0]               i_test_pattern_grn,
+    input logic     [7:0]               i_test_pattern_blu,
+
+    // tmds encoding control
+    output logic                        o_hsync,
+    output logic                        o_vsync,
+    output logic                        o_data_en,
+    output logic    [7:0]               o_red,
+    output logic    [7:0]               o_grn,
+    output logic    [7:0]               o_blu
+
 );
 
 localparam int HLen = $clog2(HMAX);
@@ -51,6 +71,47 @@ always_ff @(posedge clk) begin
         data_en <= 0;
     end    
 end
+
+localparam bit TestPatternInit = 1'b1;
+logic [31:0]    cfg_data = {31'b0, TestPatternInit};
+logic           test_pattern_en;
+
+assign test_pattern_en = cfg_data[0];
+
+always_ff @(posedge clk) begin
+    if (i_cfg_valid) begin
+        cfg_data <= i_cfg_data;
+    end
+    if (!rstn) begin
+        cfg_data <= {31'b0, TestPatternInit};
+    end
+end
+
+logic [7:0] red = 0;
+logic [7:0] grn = 0;
+logic [7:0] blu = 0;
+always_ff @(posedge clk) begin
+    if (test_pattern_en) begin
+        red <= i_test_pattern_red;
+        grn <= i_test_pattern_grn;
+        blu <= i_test_pattern_blu;
+    end else begin
+        if (i_rgb_valid) begin
+            red <= i_rgb_red;
+            grn <= i_rgb_grn;
+            blu <= i_rgb_blu;
+        end
+    end
+    if (!rstn) begin
+        red <= 8'b0;
+        grn <= 8'b0;
+        blu <= 8'b0;
+    end
+end
+
+assign o_red = red;
+assign o_grn = grn;
+assign o_blu = blu;
 
 assign o_hsync = hsync;
 assign o_vsync = vsync;
