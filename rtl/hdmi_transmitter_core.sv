@@ -1,18 +1,27 @@
 // hdmi_transmitter_core.sv
 
 module hdmi_transmitter_core #(
-    parameter string RESOLUTION = "VGA"
+    parameter string    RESOLUTION = "VGA"
 )(
-    input logic                         clk,
-    input logic                         rstn,
+    input logic             clk,
+    input logic             rstn,
 
-    // input logic                         i_rgb_valid,
-    // input logic     [COLOR_DEPTH-1:0]   i_rgb_pixel,
+    // pixel stream
+    input logic             i_rgb_valid,
+    input logic     [7:0]   i_rgb_red,
+    input logic     [7:0]   i_rgb_grn,
+    input logic     [7:0]   i_rgb_blu,
+
+    // configuration
+    input logic             i_cfg_valid,
+    input logic     [31:0]  i_cfg_data,
 
     // serializer
-    input logic                         ddr_clk,
-    output logic    [2:0]               o_tmds,
-    output logic                        o_tmds_c
+    input logic             ddr_clk,
+    output logic            o_tmds_red,
+    output logic            o_tmds_grn,
+    output logic            o_tmds_blu,
+    output logic            o_tmds_c
 );
 
 generate
@@ -37,22 +46,22 @@ localparam int VTotal = VActivePixels + VFrontPorch + VSyncWidth + VBackPorch;
 
 logic [$clog2(HTotal)-1:0]    hcount;
 logic [$clog2(VTotal)-1:0]    vcount;
-logic [7:0] buffer_blu;
-logic [7:0] buffer_grn;
-logic [7:0] buffer_red;
+logic [7:0] test_pattern_red;
+logic [7:0] test_pattern_grn;
+logic [7:0] test_pattern_blu;
 test_pattern_generator #(
     .HMAX   (HTotal),
     .VMAX   (VTotal),
-    .HA (HActivePixels),
-    .VA (VActivePixels)
+    .HA     (HActivePixels),
+    .VA     (VActivePixels)
 ) u_TP (
     .clk        (clk),
     .rstn       (rstn),
     .i_hcount   (hcount),
     .i_vcount   (vcount),
-    .o_blu      (buffer_blu),
-    .o_grn      (buffer_grn),
-    .o_red      (buffer_red)
+    .o_red      (test_pattern_red),
+    .o_grn      (test_pattern_grn),
+    .o_blu      (test_pattern_blu)
 );
 
 
@@ -61,69 +70,90 @@ pixel_counter #(
     .HMAX   (HTotal),
     .VMAX   (VTotal)
 ) u_PC (
-    .clk            (clk),
-    .rstn           (rstn),
-    .i_inc          (pixel_inc),
-    .o_hcount       (hcount),
-    .o_vcount       (vcount)
+    .clk        (clk),
+    .rstn       (rstn),
+    .i_inc      (pixel_inc),
+    .o_hcount   (hcount),
+    .o_vcount   (vcount)
 );
 
 logic tmds_hsync;
 logic tmds_vsync;
 logic tmds_data_en;
+logic [7:0] tmds_red;
+logic [7:0] tmds_grn;
+logic [7:0] tmds_blu;
+
 hdmi_controller #(
-    .HA (HActivePixels),
-    .HF (HFrontPorch),
-    .HS (HSyncWidth),
-    .HB (HBackPorch),
-    .VA (VActivePixels),
-    .VF (VFrontPorch),
-    .VS (VSyncWidth),
-    .VB (VBackPorch)
+    .HA         (HActivePixels),
+    .HF         (HFrontPorch),
+    .HS         (HSyncWidth),
+    .HB         (HBackPorch),
+    .VA         (VActivePixels),
+    .VF         (VFrontPorch),
+    .VS         (VSyncWidth),
+    .VB         (VBackPorch)
 ) u_HC (
-    .clk            (clk),
-    .rstn           (rstn),
-    .o_pixel_inc    (pixel_inc),
-    .i_hcount       (hcount),
-    .i_vcount       (vcount),
-    .o_hsync        (tmds_hsync),
-    .o_vsync        (tmds_vsync),
-    .o_data_en      (tmds_data_en)
+    .clk                (clk),
+    .rstn               (rstn),
+    .i_rgb_valid        (i_rgb_valid),
+    .i_rgb_red          (i_rgb_red),
+    .i_rgb_grn          (i_rgb_grn),
+    .i_rgb_blu          (i_rgb_blu),
+    .i_cfg_valid        (i_cfg_valid),
+    .i_cfg_data         (i_cfg_data),
+    .i_hcount           (hcount),
+    .i_vcount           (vcount),
+    .o_pixel_inc        (pixel_inc),
+    .i_test_pattern_red (test_pattern_red),
+    .i_test_pattern_grn (test_pattern_grn),
+    .i_test_pattern_blu (test_pattern_blu),
+    .o_hsync            (tmds_hsync),
+    .o_vsync            (tmds_vsync),
+    .o_data_en          (tmds_data_en),
+    .o_red              (tmds_red),
+    .o_grn              (tmds_grn),
+    .o_blu              (tmds_blu)
 );
 
 
+// TMDS Encoders
 logic [3:0] ctl;
 assign ctl = 4'b0;
 
 logic [9:0] tmds_d[4];
 
-tmds_encoder u_BLU (
-    .clk            (clk),
-    .i_data_en      (tmds_data_en),
-    .i_data         (buffer_blu),
-    .i_ctrl         ({tmds_hsync, tmds_vsync}),
-    .o_q            (tmds_d[0])
-);
-tmds_encoder u_GRN (
-    .clk            (clk),
-    .i_data_en      (tmds_data_en),
-    .i_data         (buffer_grn),
-    .i_ctrl         (ctl[1:0]),
-    .o_q            (tmds_d[1])
-);
 tmds_encoder u_RED (
     .clk            (clk),
     .i_data_en      (tmds_data_en),
-    .i_data         (buffer_red),
+    .i_data         (tmds_red),
     .i_ctrl         (ctl[3:2]),
     .o_q            (tmds_d[2])
 );
-assign tmds_d[3] = 10'b0000011111;
+
+tmds_encoder u_GRN (
+    .clk            (clk),
+    .i_data_en      (tmds_data_en),
+    .i_data         (tmds_grn),
+    .i_ctrl         (ctl[1:0]),
+    .o_q            (tmds_d[1])
+);
+
+tmds_encoder u_BLU (
+    .clk            (clk),
+    .i_data_en      (tmds_data_en),
+    .i_data         (tmds_blu),
+    .i_ctrl         ({tmds_hsync, tmds_vsync}),
+    .o_q            (tmds_d[0])
+);
+
+// output serializer
+assign tmds_d[3] = 10'b0000011111;  // tmds pixel clock
 
 logic [1:0] cascade[4];
 
 logic [3:0] tmds_channels;
-assign {o_tmds_c, o_tmds[2], o_tmds[1], o_tmds[0]} = tmds_channels[3:0];
+assign {o_tmds_c, o_tmds_red, o_tmds_grn, o_tmds_blu} = tmds_channels[3:0];
 
 logic serdes_reset = 1;
 always_ff @(posedge clk) begin
